@@ -1,6 +1,8 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { config } from './config/env';
+import router from './routes/index';
+import { errorMiddleware } from './middlewares/error.middleware';
 
 const app = express();
 
@@ -9,24 +11,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get('/api/health', (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  });
-});
+// Rutas
+app.use('/api', router);
 
 // 404
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ message: 'Ruta no encontrada' });
 });
 
-// Error handler
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(`[ERROR]:`, err.message);
-  res.status(500).json({ message: 'Error interno del servidor' });
-});
+// Error handler centralizado (debe ser el último middleware)
+app.use(errorMiddleware);
 
 app.listen(config.port, () => {
   console.log(`Servidor iniciado en http://localhost:${config.port}`);
