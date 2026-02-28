@@ -6,6 +6,9 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# OpenSSL requerido por el query engine de Prisma en Alpine (musl libc)
+RUN apk add --no-cache openssl
+
 # Copiar manifiestos de dependencias y schema de Prisma primero
 # (aprovecha el cache de capas de Docker si no cambian)
 COPY package*.json tsconfig.json ./
@@ -28,6 +31,9 @@ RUN npm run build
 FROM node:18-alpine AS production
 
 WORKDIR /app
+
+# OpenSSL requerido por el query engine de Prisma en Alpine (musl libc)
+RUN apk add --no-cache openssl
 
 # Copiar manifiestos para instalar solo dependencias de producción
 COPY package*.json ./

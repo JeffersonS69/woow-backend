@@ -125,20 +125,10 @@ Esto realiza de forma automática:
 - Construye la imagen de la app (compila TypeScript)
 - Levanta un contenedor PostgreSQL y espera a que esté listo
 - Ejecuta las migraciones de base de datos
+- Inserta los usuarios de prueba (`admin@woow.com` y `user@woow.com`)
 - Inicia el servidor en el puerto `3001`
 
 El servidor queda disponible en `http://localhost:3001`.
-
-**3. (Opcional) Cargar datos de prueba**
-
-```bash
-# Con los contenedores corriendo, ejecutar en otra terminal:
-docker compose exec db psql -U postgres -d woow_db -c "
-INSERT INTO users (name, email, password, role, \"createdAt\", \"updatedAt\") VALUES
-  ('Administrador', 'admin@woow.com', '\$2a\$12\$6Y1wNzwJ7scW2vZsEaX7gecULe.M1U4ZPMmjFSrWZSd/Jnhcduntu', 'ADMIN', NOW(), NOW()),
-  ('Usuario de Prueba', 'user@woow.com', '\$2a\$12\$OvG/XXnlajV0o6G.ZhZPeOSt5jHCTpU0cB0asK48gKnvDEh/ImqNm', 'USER', NOW(), NOW())
-ON CONFLICT (email) DO NOTHING;"
-```
 
 **Comandos útiles de Docker:**
 
@@ -469,14 +459,52 @@ curl http://localhost:3001/api/users \
 
 ## Credenciales de prueba
 
-Después de ejecutar `database/seed.sql`:
+Los usuarios de prueba se crean **automáticamente** al arrancar el proyecto (tanto con Docker como localmente con el comando de seed).
 
 | Rol   | Email              | Password    |
 |-------|--------------------|-------------|
-| ADMIN | admin@woow.com     | Admin1234   |
-| USER  | user@woow.com      | User1234    |
+| ADMIN | `admin@woow.com`   | `Admin1234` |
+| USER  | `user@woow.com`    | `User1234`  |
 
-> Las contraseñas están hasheadas con bcrypt (12 rounds) en la base de datos.
+> Las contraseñas están hasheadas con bcrypt (12 rounds). El script usa `upsert`, por lo que es seguro ejecutarlo múltiples veces sin duplicar registros.
+
+### Con Docker
+
+Los usuarios se insertan automáticamente al hacer `docker compose up --build`. No se requiere ningún paso adicional.
+
+### Sin Docker (local)
+
+```bash
+# Después de ejecutar las migraciones, correr el seed manualmente:
+npx prisma db seed
+
+# O directamente:
+node prisma/seed.js
+```
+
+### Flujo de prueba del endpoint de administrador
+
+```bash
+# 1. Login con el usuario admin
+TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@woow.com","password":"Admin1234"}' \
+  | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).token))")
+
+# 2. Listar todos los usuarios (solo accesible con rol ADMIN)
+curl http://localhost:3001/api/users \
+  -H "Authorization: Bearer $TOKEN"
+
+# 3. Verificar que un usuario normal recibe 403
+TOKEN_USER=$(curl -s -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@woow.com","password":"User1234"}' \
+  | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).token))")
+
+curl http://localhost:3001/api/users \
+  -H "Authorization: Bearer $TOKEN_USER"
+# → {"message":"Acceso denegado: se requiere rol de administrador"}
+```
 
 ---
 
@@ -503,7 +531,8 @@ woow_backend/
 │   └── seed.sql            # Datos de prueba
 ├── prisma/
 │   ├── migrations/         # Historial de migraciones
-│   └── schema.prisma       # Definición del modelo de datos
+│   ├── schema.prisma       # Definición del modelo de datos
+│   └── seed.js             # Datos de prueba (admin + user), se ejecuta al arrancar
 ├── src/
 │   ├── config/
 │   │   ├── env.ts          # Validación de variables de entorno (fail-fast)
