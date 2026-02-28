@@ -8,6 +8,8 @@ REST API con autenticación JWT para gestión de usuarios, construida con Node.j
 - [Prerrequisitos](#prerrequisitos)
 - [Instalación](#instalación)
 - [Cómo ejecutar el proyecto](#cómo-ejecutar-el-proyecto)
+  - [Con Docker (recomendado)](#con-docker-recomendado)
+  - [Sin Docker (local)](#sin-docker-local)
 - [Cómo crear la base de datos](#cómo-crear-la-base-de-datos)
 - [Variables de entorno](#variables-de-entorno)
 - [Endpoints disponibles](#endpoints-disponibles)
@@ -34,11 +36,20 @@ API REST que implementa un sistema de autenticación y gestión de usuarios con 
 
 ## Prerrequisitos
 
+**Para ejecución local:**
+
 | Herramienta | Versión mínima |
 |-------------|---------------|
 | Node.js     | 18.x          |
 | npm         | 9.x           |
 | PostgreSQL  | 14.x          |
+
+**Para ejecución con Docker:**
+
+| Herramienta    | Versión mínima |
+|----------------|---------------|
+| Docker         | 24.x          |
+| Docker Compose | 2.x           |
 
 ---
 
@@ -93,18 +104,103 @@ psql -U postgres -d woow_db -f database/seed.sql
 
 ## Cómo ejecutar el proyecto
 
-### Backend
+### Con Docker (recomendado)
+
+No necesitas instalar Node.js ni PostgreSQL localmente. Docker levanta todo automáticamente.
+
+**1. Clonar el repositorio**
+
+```bash
+git clone <url-del-repositorio>
+cd woow_backend
+```
+
+**2. Levantar los servicios**
+
+```bash
+docker compose up --build
+```
+
+Esto realiza de forma automática:
+- Construye la imagen de la app (compila TypeScript)
+- Levanta un contenedor PostgreSQL y espera a que esté listo
+- Ejecuta las migraciones de base de datos
+- Inicia el servidor en el puerto `3001`
+
+El servidor queda disponible en `http://localhost:3001`.
+
+**3. (Opcional) Cargar datos de prueba**
+
+```bash
+# Con los contenedores corriendo, ejecutar en otra terminal:
+docker compose exec db psql -U postgres -d woow_db -c "
+INSERT INTO users (name, email, password, role, \"createdAt\", \"updatedAt\") VALUES
+  ('Administrador', 'admin@woow.com', '\$2a\$12\$6Y1wNzwJ7scW2vZsEaX7gecULe.M1U4ZPMmjFSrWZSd/Jnhcduntu', 'ADMIN', NOW(), NOW()),
+  ('Usuario de Prueba', 'user@woow.com', '\$2a\$12\$OvG/XXnlajV0o6G.ZhZPeOSt5jHCTpU0cB0asK48gKnvDEh/ImqNm', 'USER', NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;"
+```
+
+**Comandos útiles de Docker:**
+
+```bash
+# Levantar en segundo plano
+docker compose up --build -d
+
+# Ver logs de la app
+docker compose logs -f app
+
+# Ver logs de la base de datos
+docker compose logs -f db
+
+# Detener los contenedores (conserva los datos)
+docker compose down
+
+# Detener y eliminar todos los datos de la BD
+docker compose down -v
+
+# Reconstruir la imagen tras cambios de código
+docker compose up --build
+```
+
+---
+
+### Sin Docker (local)
+
+Requiere Node.js 18+, npm 9+ y PostgreSQL 14+ instalados localmente.
+
+**1.** Clonar el repositorio e instalar dependencias:
+
+```bash
+git clone <url-del-repositorio>
+cd woow_backend
+npm install
+```
+
+**2.** Configurar variables de entorno:
+
+```bash
+cp .env.example .env
+# Editar .env con tus credenciales de PostgreSQL locales
+```
+
+**3.** Crear la base de datos y ejecutar migraciones:
+
+```bash
+psql -U postgres -c "CREATE DATABASE woow_db;"
+npx prisma migrate dev --name init
+```
+
+**4.** Iniciar el servidor:
 
 ```bash
 # Desarrollo (hot-reload)
 npm run dev
 
 # Producción
-npm run build
-npm start
+npm run build && npm start
 ```
 
-El servidor queda disponible en `http://localhost:3001` (o el puerto configurado en `.env`).
+El servidor queda disponible en `http://localhost:3001`.
 
 ### Frontend
 
